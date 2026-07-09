@@ -1,11 +1,12 @@
-# AI Travel Planning System using LangGraph
+# Travel Planner using LangGraph And AI
 
-A real world multi agent AI system built with LangGraph. Four AI agents work together to plan a complete trip automatically, from flights and hotels to a day by day itinerary, with conversation memory persisted in PostgreSQL.
+A real world multi agent AI system built with LangGraph. Five AI agents work together to plan a complete trip automatically, from flights and hotels to restaurant recommendations and a day by day itinerary, with conversation memory persisted in PostgreSQL.
 
 ## Features
 
 - ✈️ Flight Search Agent
 - 🏨 Hotel Search Agent
+- 🍜 Food Agent (restaurant recommendations)
 - 🗓️ Itinerary Planning Agent
 - 🤖 Final Response Agent
 - 🧠 Long term memory using PostgreSQL checkpointing
@@ -23,18 +24,20 @@ A real world multi agent AI system built with LangGraph. Four AI agents work tog
 - Streamlit
 - Tavily API (hotel and web search)
 - AviationStack API (flight data)
+- Google Places API (restaurant search)
 
 ---
 
 ## How It Works
 
-The system runs a linear graph of four agents. Each agent updates a shared state object, and every step is checkpointed to PostgreSQL so a session can be resumed later using its thread ID.
+The system runs a linear graph of five agents. Each agent updates a shared state object, and every step is checkpointed to PostgreSQL so a session can be resumed later using its thread ID.
 
 1. **Flight Agent** searches flights via AviationStack
 2. **Hotel Agent** searches hotels via Tavily
-3. **Itinerary Agent** builds a travel plan from the flight and hotel results
-4. **Final Agent** combines everything into a single polished response
-5. **PostgreSQL** stores the conversation state as memory
+3. **Food Agent** searches restaurants via Google Places
+4. **Itinerary Agent** builds a travel plan from the flight, hotel, and restaurant results
+5. **Final Agent** combines everything into a single polished response
+6. **PostgreSQL** stores the conversation state as memory
 
 ---
 
@@ -99,7 +102,22 @@ CREATE DATABASE langgraph_memory;
 
 ---
 
-### Step 5: Create the `.env` file
+### Step 5: Set up the Google Places API
+
+The Food Agent uses the Google Places API. This needs three things to all live on the same Google Cloud project: the API enabled, billing attached, and an API key. If any of these are on a different project, calls fail with `REQUEST_DENIED`.
+
+1. Go to https://console.cloud.google.com
+2. Create a dedicated project (project dropdown at the top, then "New project"). Name it something like `travel-planner`.
+3. Select that project in the top dropdown so it is the active project.
+4. In the top search bar, type "Places API", open it, and click "Enable". Use the legacy "Places API" (service `places-backend.googleapis.com`), not "Places API (New)", since the tool uses the Text Search endpoint.
+5. Open the left menu, go to "Billing", and link a billing account. Google requires this even for the free tier. You will not be charged under light testing usage.
+6. Go to "APIs and Services", then "Credentials", click "Create credentials", then "API key". Creating the key while your project is selected guarantees it belongs to the right project.
+
+Avoid the "Maps Platform Demo Project" that appears in the project list. It is a Google sandbox and is not meant for your own keys.
+
+---
+
+### Step 6: Create the `.env` file
 
 Create a `.env` file in the project root with the following keys:
 
@@ -107,6 +125,7 @@ Create a `.env` file in the project root with the following keys:
 GROQ_API_KEY=your_groq_api_key
 TAVILY_API_KEY=your_tavily_api_key
 AVIATIONSTACK_API_KEY=your_aviationstack_api_key
+GOOGLE_API_KEY=your_google_places_api_key
 DATABASE_URL=postgresql://postgres:your_password@localhost:5432/langgraph_memory
 ```
 
@@ -114,13 +133,14 @@ Match the password and port in `DATABASE_URL` to what you set during PostgreSQL 
 
 ---
 
-### Step 6: Get your API keys
+### Step 7: Get your API keys
 
 | Service | URL |
 | --- | --- |
 | Groq | https://console.groq.com |
 | Tavily | https://tavily.com |
 | AviationStack | https://aviationstack.com |
+| Google Places | https://console.cloud.google.com |
 
 ---
 
@@ -145,7 +165,7 @@ This opens the web interface at http://localhost:8501
 ### Example prompt
 
 ```
-Plan a complete 7 day Japan trip including flights, hotels and sightseeing under 2 lakhs.
+Give me a travel plan from Delhi to Glasgow under 4 lakhs for a couple.
 ```
 
 ---
@@ -170,6 +190,16 @@ If a previous failed run left the checkpoint tables half created, drop them and 
 psql -U postgres -d langgraph_memory -c "DROP TABLE IF EXISTS checkpoints, checkpoint_blobs, checkpoint_writes, checkpoint_migrations CASCADE;"
 ```
 
+**Food Agent returns no restaurants, or the final plan has no food section**
+
+Test the tool on its own:
+
+```bash
+python -c "from tools.food_tool import search_restaurants; print(search_restaurants('Glasgow'))"
+```
+
+If it prints `REQUEST_DENIED`, the API, billing, and key are not all on the same Google Cloud project, or the key has a restriction blocking Places. Recheck Step 5. If it returns real restaurants but they still do not show in the final plan, confirm the itinerary and final prompts in `main.py` include `food_results`.
+
 **Connection refused when starting the app**
 
 PostgreSQL is not running, or the port in `DATABASE_URL` does not match your actual Postgres port. Confirm the service is up and the port is correct.
@@ -184,7 +214,8 @@ PostgreSQL is not running, or the port in `DATABASE_URL` does not match your act
 ├── frontend.py          # Streamlit web interface
 ├── tools/
 │   ├── tavily_tool.py   # Hotel and web search via Tavily
-│   └── flight_tool.py   # Flight search via AviationStack
+│   ├── flight_tool.py   # Flight search via AviationStack
+│   └── food_tool.py     # Restaurant search via Google Places
 ├── .env                 # API keys and database URL (not committed)
 └── README.md
 ```
