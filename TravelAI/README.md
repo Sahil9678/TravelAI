@@ -1,8 +1,6 @@
 # AI Travel Planning System using LangGraph
 
-This project is a Real-World Multi-Agent AI System built using LangGraph.
-
-The system uses 4 AI agents that work together to plan a complete trip automatically.
+A real world multi agent AI system built with LangGraph. Four AI agents work together to plan a complete trip automatically, from flights and hotels to a day by day itinerary, with conversation memory persisted in PostgreSQL.
 
 ## Features
 
@@ -10,147 +8,183 @@ The system uses 4 AI agents that work together to plan a complete trip automatic
 - 🏨 Hotel Search Agent
 - 🗓️ Itinerary Planning Agent
 - 🤖 Final Response Agent
-- 🧠 Memory using PostgreSQL
-- 🌐 Real-time API Integration
-- 💻 Streamlit Web Interface
+- 🧠 Long term memory using PostgreSQL checkpointing
+- 🌐 Real time API integration
+- 💻 Streamlit web interface
 
 ---
 
-# Tech Stack
+## Tech Stack
 
 - LangGraph
 - LangChain
-- Groq
-- Llama 3.3 70B
+- Groq (Llama 3.3 70B)
 - PostgreSQL
 - Streamlit
-- Tavily API
-- AviationStack API
+- Tavily API (hotel and web search)
+- AviationStack API (flight data)
 
 ---
 
-# Step 1: Create Python Environment
+## How It Works
 
-Open the terminal inside the project folder and run:
+The system runs a linear graph of four agents. Each agent updates a shared state object, and every step is checkpointed to PostgreSQL so a session can be resumed later using its thread ID.
 
-		python -m venv langgraph_env3
-
-
-Now activate the environment:
-
-#### Windows
-
-		langgraph_env3\Scripts\activate
-
-
-#### YouTube Tuturial (Hindi) - https://youtu.be/ctHby5vhDqg
-
-#### YouTube Tuturial (English) -  https://youtu.be/_5XF5CCnbDk
+1. **Flight Agent** searches flights via AviationStack
+2. **Hotel Agent** searches hotels via Tavily
+3. **Itinerary Agent** builds a travel plan from the flight and hotel results
+4. **Final Agent** combines everything into a single polished response
+5. **PostgreSQL** stores the conversation state as memory
 
 ---
 
-# Step 2: Install Dependencies
+## Setup
 
-Run the following command:
+### Step 1: Create a Python environment
 
-		pip install langgraph langchain langchain-openai langchain-groq langchain-community langchain-tavily psycopg[binary] psycopg_pool python-dotenv tavily-python requests streamlit
+Open a terminal inside the project folder and run:
 
-		pip install -U "psycopg[binary,pool]"  langgraph-checkpoint-postgres
+```bash
+python -m venv langgraph_env3
+```
 
----
+Activate it.
 
-# Step 3: Install PostgreSQL
+**Windows**
 
-Download and install PostgreSQL: https://www.postgresql.org/download/
+```bash
+langgraph_env3\Scripts\activate
+```
 
-⚠️ Important:
-While installing PostgreSQL, remember:
-- PostgreSQL Password
-- Port Number
+**macOS / Linux**
 
-You will need them later while creating the database connection string.
-
----
-
-# Step 4: Create Database
-
-Open PostgreSQL and run:
-
-CREATE DATABASE langgraph_memory_demo;
-
+```bash
+source langgraph_env3/bin/activate
+```
 
 ---
 
-# Step 5: Setup `.env` File
+### Step 2: Install dependencies
 
-Create a `.env` file inside the project folder.
+```bash
+pip install langgraph langchain langchain-openai langchain-groq langchain-community langchain-tavily python-dotenv tavily-python requests streamlit
+```
 
-Add the following keys:
+```bash
+pip install -U "psycopg[binary,pool]" langgraph-checkpoint-postgres
+```
 
+The second line is important. `PostgresSaver` does not ship with the base `langgraph` package. It lives in `langgraph-checkpoint-postgres`, so skipping that line causes an unresolved import for `langgraph.checkpoint.postgres`.
+
+---
+
+### Step 3: Install PostgreSQL
+
+Download and install from https://www.postgresql.org/download/
+
+While installing, note down two things, because you will need them for the connection string:
+
+- The PostgreSQL password you set
+- The port number (default is 5432)
+
+---
+
+### Step 4: Create the database
+
+Open pgAdmin or psql and run:
+
+```sql
+CREATE DATABASE langgraph_memory;
+```
+
+---
+
+### Step 5: Create the `.env` file
+
+Create a `.env` file in the project root with the following keys:
+
+```
 GROQ_API_KEY=your_groq_api_key
-
 TAVILY_API_KEY=your_tavily_api_key
-
 AVIATIONSTACK_API_KEY=your_aviationstack_api_key
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/langgraph_memory
+```
 
-DATABASE_URL=postgresql://postgres:postgres@localhost:5433/langgraph_memory_demo
-
-
----
-
-# Step 6: Get API Keys
-
-## Get Groq API Key
-
-https://console.groq.com
+Match the password and port in `DATABASE_URL` to what you set during PostgreSQL installation. If your Postgres runs on 5433, change the port in the URL to 5433.
 
 ---
 
-## Get Tavily API Key
+### Step 6: Get your API keys
 
-https://tavily.com
-  
----
-
-## Get AviationStack API Key
-
-https://aviationstack.com
+| Service | URL |
+| --- | --- |
+| Groq | https://console.groq.com |
+| Tavily | https://tavily.com |
+| AviationStack | https://aviationstack.com |
 
 ---
 
-# Step 7: Run the Application
+## Running the Application
 
-#### Run Multi-Agent System in Terminal
+### Terminal (test the multi agent pipeline)
 
-		python main.py
+```bash
+python main.py
+```
 
+You will be prompted to enter a travel request. This is the fastest way to confirm the full agent graph works before launching the UI.
 
-This will test the multi-agent system through the terminal.
+### Streamlit web app
 
----
+```bash
+streamlit run frontend.py
+```
 
-#### Run Streamlit Web App
+This opens the web interface at http://localhost:8501
 
+### Example prompt
 
-		streamlit run frontend.py
-
-
-This will launch the Multi-Agent AI web application.
-
----
-
-#### Example Prompt
-
-Plan a complete 7 days Japan trip including flights, hotels and sightseeing under 2 lakhs.
-
+```
+Plan a complete 7 day Japan trip including flights, hotels and sightseeing under 2 lakhs.
+```
 
 ---
 
-# Project Workflow
+## Troubleshooting
 
-1. Flight Agent searches flights
-2. Hotel Agent searches hotels
-3. Itinerary Agent creates travel plan
-4. Final Agent combines everything together
-5. PostgreSQL stores conversation memory
+**`Unresolved reference 'PostgresSaver'` or `cannot find reference 'postgres'`**
 
+The `langgraph-checkpoint-postgres` package is missing from the environment your editor or terminal is using. Install it with the Step 2 command. If the terminal import works but your IDE still shows red squiggles, point the IDE interpreter at `langgraph_env3` rather than a global Python.
+
+**`psycopg.errors.ActiveSqlTransaction: CREATE INDEX CONCURRENTLY cannot run inside a transaction block`**
+
+The checkpointer setup runs migrations that cannot execute inside a transaction. The database connection must use autocommit. In `main.py`, the connection should be:
+
+```python
+_conn = psycopg.connect(DATABASE_URL, autocommit=True)
+```
+
+If a previous failed run left the checkpoint tables half created, drop them and let setup rebuild cleanly:
+
+```bash
+psql -U postgres -d langgraph_memory -c "DROP TABLE IF EXISTS checkpoints, checkpoint_blobs, checkpoint_writes, checkpoint_migrations CASCADE;"
+```
+
+**Connection refused when starting the app**
+
+PostgreSQL is not running, or the port in `DATABASE_URL` does not match your actual Postgres port. Confirm the service is up and the port is correct.
+
+---
+
+## Project Structure
+
+```
+.
+├── main.py              # Graph definition, agents, checkpointer, CLI entry point
+├── frontend.py          # Streamlit web interface
+├── tools/
+│   ├── tavily_tool.py   # Hotel and web search via Tavily
+│   └── flight_tool.py   # Flight search via AviationStack
+├── .env                 # API keys and database URL (not committed)
+└── README.md
+```
