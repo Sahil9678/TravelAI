@@ -377,6 +377,7 @@ generate = st.button("🚀  Generate My Travel Plan", use_container_width=True)
 AGENT_META = {
     "flight_agent":    ("✈️", "Flight Agent"),
     "hotel_agent":     ("🏨", "Hotel Agent"),
+    "food_agent":      ("🍜", "Food Agent"),
     "itinerary_agent": ("🗓️", "Itinerary Agent"),
     "final_agent":     ("🧠", "Final Agent"),
 }
@@ -386,7 +387,7 @@ if generate:
         st.warning("Please describe your trip first.")
     else:
         config = {"configurable": {"thread_id": thread_id}}
-        collected = {"flight_results": "", "hotel_results": "",
+        collected = {"flight_results": "", "hotel_results": "","food_results": "",
                      "itinerary": "", "final_response": "", "llm_calls": 0}
 
         st.markdown("---")
@@ -399,6 +400,7 @@ if generate:
                 "user_query": user_query,
                 "flight_results": "",
                 "hotel_results": "",
+                "food_results": "",
                 "itinerary": "",
                 "llm_calls": 0,
             },
@@ -419,6 +421,11 @@ if generate:
                         collected["hotel_results"] = text
                         st.markdown(text or "_No hotel data returned._")
 
+                    elif node_name == "food_agent":
+                        text = state_update.get("food_results", "")
+                        collected["food_results"] = text
+                        st.markdown(text or "_No restaurant data returned._")
+
                     elif node_name == "itinerary_agent":
                         text = state_update.get("itinerary", "")
                         collected["itinerary"] = text
@@ -435,7 +442,7 @@ if generate:
         # Metrics
         st.markdown(f"""
         <div class="metric-row">
-            <div class="metric-box"><div class="metric-val">4</div><div class="metric-lbl">Agents Run</div></div>
+            <div class="metric-box"><div class="metric-val">5</div><div class="metric-lbl">Agents Run</div></div>
             <div class="metric-box"><div class="metric-val">{collected['llm_calls']}</div><div class="metric-lbl">LLM Calls</div></div>
             <div class="metric-box"><div class="metric-val">✅</div><div class="metric-lbl">Status</div></div>
         </div>
@@ -473,6 +480,11 @@ if generate:
 
 ## 🗓️ Itinerary
 {collected['itinerary'] or 'N/A'}
+
+---
+
+## 🍜 Restaurant Recommendations
+{collected['food_results'] or 'N/A'}
 
 ---
 

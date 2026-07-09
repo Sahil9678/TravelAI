@@ -26,6 +26,7 @@ from langchain_groq import ChatGroq
 
 from tools.tavily_tool import tavily_search
 from tools.flight_tool import search_flights
+from tools.food_tool import search_restaurants
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -42,6 +43,7 @@ class TravelState(TypedDict):
     user_query: str
     flight_results: str
     hotel_results: str
+    food_results: str
     itinerary: str
     llm_calls: int
 
@@ -70,6 +72,19 @@ def hotel_agent(state: TravelState):
         "llm_calls": state.get("llm_calls", 0) + 1
     }
 
+
+# Food Agent
+def food_agent(state: TravelState):
+    query = state["user_query"]
+    food_data = search_restaurants(query)
+    return {
+        "food_results": food_data,
+        "messages": [
+            AIMessage(content="Restaurant recommendations fetched")
+        ],
+        "llm_calls": state.get("llm_calls", 0) + 1
+    }
+
 # Itinerary Agent
 def itinerary_agent(state: TravelState):
 
@@ -83,6 +98,9 @@ def itinerary_agent(state: TravelState):
 
     Hotel Results:
     {state['hotel_results']}
+    
+    Restaurant Results:
+    {state.get('food_results', '')}
     """
 
     response = llm.invoke([
@@ -109,6 +127,9 @@ def final_agent(state: TravelState):
 
     Hotels:
     {state['hotel_results']}
+    
+    Restaurants:
+    {state.get('food_results', '')}
 
     Itinerary:
     {state['itinerary']}
@@ -128,12 +149,14 @@ graph = StateGraph(TravelState)
 
 graph.add_node("flight_agent", flight_agent)
 graph.add_node("hotel_agent", hotel_agent)
+graph.add_node("food_agent", food_agent)
 graph.add_node("itinerary_agent", itinerary_agent)
 graph.add_node("final_agent", final_agent)
 
 graph.add_edge(START, "flight_agent")
 graph.add_edge("flight_agent", "hotel_agent")
-graph.add_edge("hotel_agent", "itinerary_agent")
+graph.add_edge("hotel_agent", "food_agent")
+graph.add_edge("food_agent", "itinerary_agent")
 graph.add_edge("itinerary_agent", "final_agent")
 graph.add_edge("final_agent", END)
 
@@ -147,6 +170,8 @@ app = graph.compile(checkpointer=checkpointer)
 
 
 if __name__ == "__main__":
+
+    print(search_restaurants("Glasgow"))
     config = {
         "configurable": {
             "thread_id": "user"
@@ -163,6 +188,7 @@ if __name__ == "__main__":
             "user_query": user_input,
             "flight_results": "",
             "hotel_results": "",
+            "food_results": "",
             "itinerary": "",
             "llm_calls": 0
         },
